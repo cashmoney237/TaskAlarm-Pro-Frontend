@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'https://taskalarm-pro-backend.onrender.com/api';
 let authToken = localStorage.getItem('token');
 
 async function apiRequest(endpoint, method, body = null) {
