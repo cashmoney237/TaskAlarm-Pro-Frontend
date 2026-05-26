@@ -1,0 +1,27 @@
+<!-- alarm.html (unchanged logic, just loading screen) -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskAlarm Pro</title>
+    <link rel="stylesheet" href="main.css">
+</head>
+<body>
+    <div class="loading-screen">
+        <div class="spinner"></div>
+        <p>Loading...</p>
+    </div>
+    
+    <script src="utils.js"></script>
+    <script src="storage.js"></script>
+    <script>
+        const currentUser = Storage.getCurrentUser();
+        if (currentUser) {
+            window.location.href = 'dashboard.html';
+        } else {
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>

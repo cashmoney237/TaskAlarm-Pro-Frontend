@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - TaskAlarm Pro</title>
+  <link rel="stylesheet" href="main.css">
+  <link rel="stylesheet" href="dashboard.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+<div class="app-container">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header"><i class="fas fa-check-circle"></i><h2>TaskAlarm</h2><button class="close-sidebar" id="closeSidebarBtn"><i class="fas fa-times"></i></button></div>
+    <div class="user-profile" id="userProfile"><div class="avatar" id="userAvatar"></div><div class="user-info"><h4 id="userName"></h4><p id="userEmail"></p></div></div>
+    <nav class="nav-menu">
+      <a href="#" class="nav-item active" data-page="tasks"><i class="fas fa-tasks"></i><span>My Tasks</span><span class="badge" id="pendingBadge">0</span></a>
+      <a href="#" class="nav-item" data-page="alarms"><i class="fas fa-bell"></i><span>Active Alarms</span><span class="badge" id="alarmBadge">0</span></a>
+      <a href="#" class="nav-item" data-page="completed"><i class="fas fa-check-double"></i><span>Completed</span><span class="badge" id="completedBadge">0</span></a>
+      <a href="#" class="nav-item" data-page="missed"><i class="fas fa-clock"></i><span>Missed</span><span class="badge" id="missedBadge">0</span></a>
+      <a href="#" class="nav-item" data-page="emails"><i class="fas fa-envelope"></i><span>Email History</span><span class="badge" id="emailBadge">0</span></a>
+    </nav>
+    <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+  </aside>
+  <main class="main-content">
+    <header class="top-bar">
+      <button class="mobile-menu-btn" id="mobileMenuBtn"><i class="fas fa-bars"></i></button>
+      <h1 id="pageTitle">My Tasks</h1>
+      <div style="display:flex; gap:12px;">
+        <button id="ringtoneSettingsBtn" class="btn-secondary"><i class="fas fa-music"></i> Ringtone</button>
+        <div class="time-display" id="currentTime"></div>
+      </div>
+    </header>
+    <div class="page active" id="tasksPage">
+      <div class="create-task-card"><h3><i class="fas fa-plus-circle"></i> Create New Task</h3><form id="taskForm"><div class="form-row"><div class="form-group"><label>Task Title</label><input type="text" id="taskTitle" placeholder="Enter task title" required></div><div class="form-group"><label>Date & Time</label><input type="datetime-local" id="taskDateTime" required></div></div><div class="form-group"><label>Description (Optional)</label><textarea id="taskDesc" rows="3" placeholder="Add details..."></textarea></div><button type="submit" class="btn-primary"><i class="fas fa-bell"></i> Set Alarm & Save</button></form></div>
+      <div class="tasks-section"><div class="section-header"><h3><i class="fas fa-clock"></i> Upcoming Tasks</h3><button class="btn-refresh" id="refreshTasks"><i class="fas fa-sync-alt"></i></button></div><div id="tasksList" class="tasks-list"></div></div>
+    </div>
+    <div class="page" id="alarmsPage"><div class="info-banner"><i class="fas fa-info-circle"></i><p>Alarms ring for 60 seconds then move to Missed. Complete to stop.</p></div><div id="activeAlarmsList" class="tasks-list"></div></div>
+    <div class="page" id="completedPage"><div id="completedTasksList" class="tasks-list"></div></div>
+    <div class="page" id="missedPage"><div id="missedTasksList" class="tasks-list"></div></div>
+    <div class="page" id="emailsPage"><div style="display:flex; justify-content:flex-end; margin-bottom:16px;"><button id="clearAllEmailsBtn" class="btn-secondary" style="background:rgba(239,68,68,0.2); color:#f87171;"><i class="fas fa-trash-alt"></i> Clear All Emails</button></div><div id="emailsList" class="emails-list"></div></div>
+  </main>
+</div>
+<div id="ringtoneModal" class="modal-overlay"><div class="modal-card"><h3><i class="fas fa-headphones"></i> Choose Alarm Sound</h3><div class="ringtone-preview"><button id="playPreviewBtn" class="btn-secondary"><i class="fas fa-play"></i> Preview</button><button id="stopPreviewBtn" class="btn-secondary"><i class="fas fa-stop"></i> Stop</button></div><label class="btn-primary" style="display:inline-flex; margin:12px 0; cursor:pointer;"><i class="fas fa-upload"></i> Upload from Device<input type="file" id="ringtoneFileInput" accept="audio/*" style="display:none;"></label><div><small>Current: <span id="currentRingtoneLabel">Default beep</span></small></div><div style="margin-top:20px; display:flex; gap:12px; justify-content:flex-end;"><button id="saveRingtoneBtn" class="btn-primary">Save & Apply</button><button id="closeModalBtn" class="btn-secondary">Cancel</button></div></div></div>
+<audio id="alarmSound" preload="auto"></audio>
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="utils.js"></script>
+<script src="api.js"></script>
+<script src="alarm.js"></script>
+<script src="dashboard.js"></script>
+</body>
+</html>
