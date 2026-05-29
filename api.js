@@ -1,6 +1,6 @@
 console.log('api.js loaded');
 
-// ✅ Change this to your actual Render backend URL
+// ✅ Use your actual Render backend URL (the one that was working before)
 const API_URL = 'https://elumbemikelawrce.onrender.com/api';
 
 let authToken = localStorage.getItem('token');
@@ -10,27 +10,19 @@ async function apiRequest(endpoint, method, body = null) {
   const headers = { 'Content-Type': 'application/json' };
   if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
   console.log(`API Request: ${method} ${url}`, body);
-  const response = await fetch(url, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : null
-  });
-  console.log(`API Response status: ${response.status}`);
+  const response = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : null });
   if (!response.ok) {
     let errorMsg;
     try {
       const error = await response.json();
       errorMsg = error.error || `HTTP ${response.status}`;
-    } catch (e) {
-      errorMsg = `HTTP ${response.status}`;
-    }
+    } catch (e) { errorMsg = `HTTP ${response.status}`; }
     throw new Error(errorMsg);
   }
   return response.json();
 }
 
 async function apiRegister(userData) {
-  console.log('apiRegister called with', userData);
   const data = await apiRequest('/auth/register', 'POST', userData);
   if (data.token) {
     authToken = data.token;
@@ -41,7 +33,6 @@ async function apiRegister(userData) {
 }
 
 async function apiLogin(email, password) {
-  console.log('apiLogin called');
   const data = await apiRequest('/auth/login', 'POST', { email, password });
   if (data.token) {
     authToken = data.token;
@@ -108,5 +99,3 @@ window.api = {
   resetPassword: apiResetPassword,
   getEmails, addEmail, deleteEmail, clearAllEmails
 };
-
-console.log('api.js loaded, window.api available');
