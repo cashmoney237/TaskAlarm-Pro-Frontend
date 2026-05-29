@@ -1,4 +1,6 @@
-const API_URL = 'https://elumbemikelawrce.onrender.com/api';
+// ✅ Change this to your actual Render backend URL
+const API_URL = 'https://taskalarm-backend.onrender.com/api';
+
 let authToken = localStorage.getItem('token');
 
 async function apiRequest(endpoint, method, body = null) {
@@ -55,7 +57,6 @@ async function apiDeleteTask(taskId) { return apiRequest(`/tasks/${taskId}`, 'DE
 async function apiForgotPassword(email) { return apiRequest('/auth/forgot-password', 'POST', { email }); }
 async function apiResetPassword(token, newPassword) { return apiRequest('/auth/reset-password', 'POST', { token, newPassword }); }
 
-// Email history (localStorage)
 function getEmails() {
   const user = getCurrentUser();
   if (!user) return [];

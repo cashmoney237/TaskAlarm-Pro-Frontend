@@ -4,7 +4,7 @@
   
   let tasks = [];
   let currentPage = 'tasks';
-  let socket =  io('https://elumbemikelawrce.onrender.com');
+  let socket =  null;
   let customRingtoneBlobUrl = null;   // for current session ringtone
   let selectedAudioFile = null;
   
@@ -41,7 +41,7 @@
   
   function initSocket() {
     if (!socket && currentUser && typeof io !== 'undefined') {
-      socket = io('http://localhost:5000', {
+      socket = io('https://elumbemikelawrce.onrender.com', {
         auth: { token: currentUser.id },
         transports: ['websocket', 'polling']
       });
