@@ -4,7 +4,7 @@
   
   let tasks = [];
   let currentPage = 'tasks';
-  let socket = null;
+  let socket =  io('https://elumbemikelawrce.onrender.com');
   let customRingtoneBlobUrl = null;   // for current session ringtone
   let selectedAudioFile = null;
   
