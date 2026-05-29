@@ -41,7 +41,7 @@
   
   function initSocket() {
     if (!socket && currentUser && typeof io !== 'undefined') {
-      socket = io('https://elumbemikelawrce.onrender.com', {
+      socket = io('https://taskalarm-pro.onrender.com', {
         auth: { token: currentUser.id },
         transports: ['websocket', 'polling']
       });
