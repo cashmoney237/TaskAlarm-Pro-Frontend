@@ -1,4 +1,4 @@
-console.log('api.js loaded');
+
 
 // ✅ Use your actual Render backend URL (the one that was working before)
 const API_URL = 'https://elumbemikelawrce.onrender.com/api';

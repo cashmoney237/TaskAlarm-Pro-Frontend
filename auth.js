@@ -1,4 +1,3 @@
-console.log('auth.js loaded');
 
 (function() {
   const currentUser = window.api?.getCurrentUser();
