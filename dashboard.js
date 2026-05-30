@@ -2,7 +2,6 @@
   const currentUser = window.api.getCurrentUser();
   if (!currentUser) { window.location.href = 'login.html'; return; }
   
-  window.allTasks = [];
   let tasks = [];
   let currentPage = 'tasks';
   let socket = null;
@@ -39,24 +38,23 @@
   
   if (typeof AlarmSystem !== 'undefined') AlarmSystem.init(null);
   
-  // ========= ALARM CHECKER (fixed: no illegal break) =========
+  // ========= ALARM CHECKER (fixed, no illegal break) =========
   function checkAlarms() {
     const now = new Date();
     const nowTime = now.getTime();
     
-    for (let i = 0; i < tasks.length; i++) {
-      const task = tasks[i];
-      if (task.isCompleted || task.isMissed) continue;
+    tasks.forEach(task => {
+      if (task.isCompleted || task.isMissed) return;
       
       const taskTime = new Date(task.scheduledTime).getTime();
       const timeDiff = nowTime - taskTime;
       
+      // Trigger if within 3 seconds of scheduled time or overdue but not triggered
       if (!task.alarmTriggered && (Math.abs(timeDiff) < 3000 || (timeDiff > 0 && timeDiff < 60000))) {
-        console.log(`🔥 TRIGGERING alarm for "${task.title}" (diff=${timeDiff}ms)`);
+        console.log(`Triggering alarm for ${task.title} (diff=${timeDiff}ms)`);
         task.alarmTriggered = true;
         
-        window.api.updateTask(task._id, { alarmTriggered: true })
-          .catch(err => console.error('Update failed:', err));
+        window.api.updateTask(task._id, { alarmTriggered: true }).catch(console.error);
         
         if (typeof AlarmSystem !== 'undefined') {
           AlarmSystem.sendEmailNotification(
@@ -70,15 +68,16 @@
         }
         
         Utils.showToast(`🔔 "${task.title}" is due!`, 'warning');
-        loadTasks();
-        break; // break is allowed in for loop (not in forEach)
+        loadTasks(); // refresh to update badges and active alarms list
+        // No break here – continue checking other tasks (rarely more than one due at same second)
       }
-    }
+    });
     
     updateBadges();
     if (currentPage === 'alarms') renderAlarmsPage();
   }
   
+  // ========= SOCKET =========
   function initSocket() {
     if (!socket && currentUser && typeof io !== 'undefined') {
       socket = io('https://elumbemikelawrce.onrender.com', {
@@ -87,22 +86,23 @@
       });
       socket.on('connect_error', (err) => console.log('Socket error:', err.message));
       socket.on('task_due', (data) => {
-        console.log('Socket task_due received', data);
-        if (typeof AlarmSystem !== 'undefined') {
-          AlarmSystem.startAlarmCycle(data, () => loadTasks());
-        }
+        console.log('Socket task_due', data);
+        if (typeof AlarmSystem !== 'undefined') AlarmSystem.startAlarmCycle(data, () => loadTasks());
+        loadTasks();
+      });
+      socket.on('task_missed', (data) => {
+        Utils.showToast(`⏰ "${data.title}" was missed`, 'warning');
         loadTasks();
       });
     }
   }
   
+  // ========= LOAD TASKS =========
   async function loadTasks() {
     try {
       tasks = await window.api.getTasks();
-      window.allTasks = tasks;
       renderCurrentPage();
       updateBadges();
-      console.log(`Loaded ${tasks.length} tasks`);
     } catch (err) {
       console.error(err);
       Utils.showToast('Failed to load tasks', 'error');
@@ -384,9 +384,7 @@
   
   // ========= CLOCK (timer) =========
   function updateTime() {
-    if (currentTimeEl) {
-      currentTimeEl.textContent = new Date().toLocaleString();
-    }
+    if (currentTimeEl) currentTimeEl.textContent = new Date().toLocaleString();
   }
   updateTime();
   setInterval(updateTime, 1000);
