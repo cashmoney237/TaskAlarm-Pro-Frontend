@@ -4,7 +4,7 @@
   
   let tasks = [];
   let currentPage = 'tasks';
-  let socket =  null;
+  let socket = null;
   let customRingtoneBlobUrl = null;   // for current session ringtone
   let selectedAudioFile = null;
   
@@ -41,7 +41,8 @@
   
   function initSocket() {
     if (!socket && currentUser && typeof io !== 'undefined') {
-      socket = io('https://taskalarm-pro.onrender.com', {
+      // ⚠️ IMPORTANT: Replace this URL with your actual Render backend URL
+      socket = io('https://elumbemikelawrce.onrender.com', {
         auth: { token: currentUser.id },
         transports: ['websocket', 'polling']
       });
@@ -276,7 +277,7 @@
     else if (currentPage === 'emails') renderEmailsPage();
   }
   
-  // Create task
+  // ✅ Create task with FIXED timezone handling (no more early alarms)
   if (taskForm) {
     taskForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -284,10 +285,23 @@
       const dateTime = document.getElementById('taskDateTime').value;
       const description = document.getElementById('taskDesc').value;
       if (!title || !dateTime) return Utils.showToast('Title and time required', 'error');
-      const scheduled = new Date(dateTime);
-      if (scheduled <= new Date()) return Utils.showToast('Future time required', 'error');
+      
+      // Convert local datetime string to a Date object
+      const localDate = new Date(dateTime);
+      // Check if the selected time is in the future (local time)
+      if (localDate <= new Date()) {
+        Utils.showToast('Future time required', 'error');
+        return;
+      }
+      
+      // ✅ CRITICAL FIX: Store the UTC equivalent of the local time so that when compared
+      // with new Date() (local) later, the difference is correct.
+      // localDate.getTimezoneOffset() returns offset in minutes (e.g., -300 for UTC+5)
+      const utcTimestamp = localDate.getTime() - (localDate.getTimezoneOffset() * 60000);
+      const scheduledTime = new Date(utcTimestamp).toISOString();
+      
       try {
-        await window.api.createTask({ title, description, scheduledTime: scheduled.toISOString() });
+        await window.api.createTask({ title, description, scheduledTime });
         await loadTasks();
         taskForm.reset();
         Utils.showToast('Task created!', 'success');
@@ -396,7 +410,6 @@
       if (previewAudio) previewAudio.pause();
       const tempUrl = URL.createObjectURL(file);
       previewAudio = new Audio(tempUrl);
-      // NO TOAST HERE – only show toast on save
     };
   }
   if (playPreview) {
@@ -431,7 +444,7 @@
       if (typeof AlarmSystem !== 'undefined') {
         AlarmSystem.updateRingtoneSource(customRingtoneBlobUrl);
       }
-      Utils.showToast('Ringtone saved successfully', 'success');  // ONLY TOAST ON SAVE
+      Utils.showToast('Ringtone saved successfully', 'success');
       if (modal) modal.style.display = 'none';
       updateRingtoneDisplay();
     };

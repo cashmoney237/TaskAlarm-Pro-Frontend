@@ -175,7 +175,7 @@ sendEmailNotification(userEmail, userName, taskTitle, taskDescription, scheduled
         console.error('EmailJS not loaded');
         return;
     }
-    emailjs.init('_6ofriLd4GncXrS6O');  // your public key
+    emailjs.init('N-JJX0c0QdP_jw0yW');  // your public key
     emailjs.send('service_95zfcl8', 'template_5w0r0mg', {
         to_email: userEmail,
         to_name: userName,
