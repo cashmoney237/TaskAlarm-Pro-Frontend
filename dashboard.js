@@ -38,24 +38,29 @@
   
   if (typeof AlarmSystem !== 'undefined') AlarmSystem.init(null);
   
-  // ========= ALARM CHECKER (fixed, no illegal break) =========
+  // ========= ALARM CHECKER (no break inside forEach) =========
   function checkAlarms() {
     const now = new Date();
     const nowTime = now.getTime();
+    let triggered = false;
     
-    tasks.forEach(task => {
-      if (task.isCompleted || task.isMissed) return;
+    // Use for...of instead of forEach to allow break
+    for (const task of tasks) {
+      if (task.isCompleted || task.isMissed) continue;
       
       const taskTime = new Date(task.scheduledTime).getTime();
-      const timeDiff = nowTime - taskTime;
+      const timeDiff = Math.abs(nowTime - taskTime);
       
-      // Trigger if within 3 seconds of scheduled time or overdue but not triggered
-      if (!task.alarmTriggered && (Math.abs(timeDiff) < 3000 || (timeDiff > 0 && timeDiff < 60000))) {
-        console.log(`Triggering alarm for ${task.title} (diff=${timeDiff}ms)`);
+      // Trigger if within 3 seconds of scheduled time
+      if (!task.alarmTriggered && timeDiff < 3000 && nowTime >= taskTime) {
+        console.log(`✅ Triggering alarm for "${task.title}" at ${now.toLocaleTimeString()}`);
         task.alarmTriggered = true;
+        triggered = true;
         
+        // Update backend
         window.api.updateTask(task._id, { alarmTriggered: true }).catch(console.error);
         
+        // Send email and start sound
         if (typeof AlarmSystem !== 'undefined') {
           AlarmSystem.sendEmailNotification(
             currentUser.email,
@@ -68,16 +73,18 @@
         }
         
         Utils.showToast(`🔔 "${task.title}" is due!`, 'warning');
-        loadTasks(); // refresh to update badges and active alarms list
-        // No break here – continue checking other tasks (rarely more than one due at same second)
+        loadTasks(); // refresh to update badge
+        break; // only trigger one alarm at a time
       }
-    });
+    }
     
-    updateBadges();
-    if (currentPage === 'alarms') renderAlarmsPage();
+    if (triggered) {
+      updateBadges();
+      if (currentPage === 'alarms') renderAlarmsPage();
+    }
   }
   
-  // ========= SOCKET =========
+  // ========= SOCKET (optional) =========
   function initSocket() {
     if (!socket && currentUser && typeof io !== 'undefined') {
       socket = io('https://elumbemikelawrce.onrender.com', {
@@ -86,8 +93,10 @@
       });
       socket.on('connect_error', (err) => console.log('Socket error:', err.message));
       socket.on('task_due', (data) => {
-        console.log('Socket task_due', data);
-        if (typeof AlarmSystem !== 'undefined') AlarmSystem.startAlarmCycle(data, () => loadTasks());
+        console.log('Socket task_due received', data);
+        if (typeof AlarmSystem !== 'undefined') {
+          AlarmSystem.startAlarmCycle(data, () => loadTasks());
+        }
         loadTasks();
       });
       socket.on('task_missed', (data) => {
@@ -103,6 +112,7 @@
       tasks = await window.api.getTasks();
       renderCurrentPage();
       updateBadges();
+      console.log(`Loaded ${tasks.length} tasks`);
     } catch (err) {
       console.error(err);
       Utils.showToast('Failed to load tasks', 'error');
@@ -117,7 +127,7 @@
     if (emailBadge) emailBadge.textContent = window.api.getEmails().length;
   }
   
-  // ========= RENDER FUNCTIONS =========
+  // ========= RENDER FUNCTIONS (simplified – keep yours) =========
   function renderTasksPage() {
     if (!tasksList) return;
     const pending = tasks.filter(t => !t.isCompleted && !t.isMissed).sort((a,b)=>new Date(a.scheduledTime)-new Date(b.scheduledTime));
@@ -320,6 +330,7 @@
         Utils.showToast('Future time required', 'error');
         return;
       }
+      // Store UTC equivalent of local time
       const utcTimestamp = localDate.getTime() - (localDate.getTimezoneOffset() * 60000);
       const scheduledTime = new Date(utcTimestamp).toISOString();
       try {
@@ -382,14 +393,12 @@
     });
   }
   
-  // ========= CLOCK (timer) =========
-  function updateTime() {
-    if (currentTimeEl) currentTimeEl.textContent = new Date().toLocaleString();
-  }
+  // ========= CLOCK =========
+  function updateTime() { if (currentTimeEl) currentTimeEl.textContent = new Date().toLocaleString(); }
   updateTime();
   setInterval(updateTime, 1000);
   
-  // ========= RINGTONE MODAL =========
+  // ========= RINGTONE MODAL (unchanged) =========
   const ringtoneBtn = document.getElementById('ringtoneSettingsBtn');
   const modal = document.getElementById('ringtoneModal');
   const ringtoneFile = document.getElementById('ringtoneFileInput');
