@@ -5,10 +5,10 @@
   let tasks = [];
   let currentPage = 'tasks';
   let socket = null;
-  let customRingtoneBlobUrl = null;   // for current session ringtone
+  let customRingtoneBlobUrl = null;
   let selectedAudioFile = null;
   
-  // DOM elements
+  // DOM elements (same as before – keep your existing)
   const userName = document.getElementById('userName');
   const userEmail = document.getElementById('userEmail');
   const userAvatar = document.getElementById('userAvatar');
@@ -36,29 +36,60 @@
   if (userEmail) userEmail.textContent = currentUser.email;
   if (userAvatar) userAvatar.textContent = currentUser.fullname.charAt(0).toUpperCase();
   
-  // Initialize alarm with default beep (no custom ringtone persisted)
   if (typeof AlarmSystem !== 'undefined') AlarmSystem.init(null);
+  
+  // ✅ CRITICAL: Check alarms every second (frontend polling)
+  function checkAlarms() {
+    const now = new Date();
+    const nowTime = now.getTime();
+    
+    tasks.forEach(task => {
+      if (task.isCompleted || task.isMissed) return;
+      
+      const taskTime = new Date(task.scheduledTime).getTime();
+      const timeDiff = Math.abs(nowTime - taskTime);
+      
+      // Trigger if within 3 seconds of scheduled time and not already triggered
+      if (!task.alarmTriggered && timeDiff < 3000 && nowTime >= taskTime) {
+        task.alarmTriggered = true;
+        
+        // Update in backend
+        window.api.updateTask(task._id, { alarmTriggered: true })
+          .catch(err => console.error('Failed to update alarm triggered:', err));
+        
+        // Send email notification (via EmailJS or backend)
+        if (typeof AlarmSystem !== 'undefined') {
+          AlarmSystem.sendEmailNotification(
+            currentUser.email,
+            currentUser.fullname,
+            task.title,
+            task.description,
+            task.scheduledTime
+          );
+          // Start the alarm sound
+          AlarmSystem.startAlarmCycle(task, () => loadTasks());
+        }
+        
+        Utils.showToast(`🔔 "${task.title}" is due!`, 'warning');
+        // Refresh tasks list to update badge
+        loadTasks();
+      }
+    });
+  }
   
   function initSocket() {
     if (!socket && currentUser && typeof io !== 'undefined') {
-      // ⚠️ IMPORTANT: Replace this URL with your actual Render backend URL
       socket = io('https://elumbemikelawrce.onrender.com', {
         auth: { token: currentUser.id },
         transports: ['websocket', 'polling']
       });
       socket.on('connect_error', (err) => console.log('Socket error:', err.message));
       socket.on('task_due', (data) => {
-        Utils.showToast(`🔔 "${data.title}" is due!`, 'warning');
-        if (typeof window.api !== 'undefined' && window.api.addEmail) {
-          window.api.addEmail({
-            to: currentUser.email,
-            subject: `⏰ Task Reminder: ${data.title}`,
-            body: `Your task "${data.title}" is due now.\nDescription: ${data.description || 'None'}\nScheduled for: ${new Date(data.scheduledTime).toLocaleString()}`
-          });
-          updateBadges();
-          if (currentPage === 'emails') renderEmailsPage();
+        // Socket event is a backup – we also have checkAlarms
+        console.log('Received task_due from server', data);
+        if (typeof AlarmSystem !== 'undefined') {
+          AlarmSystem.startAlarmCycle(data, () => loadTasks());
         }
-        if (typeof AlarmSystem !== 'undefined') AlarmSystem.startAlarmCycle(data, () => loadTasks());
         loadTasks();
       });
       socket.on('task_missed', (data) => {
@@ -87,62 +118,7 @@
     if (emailBadge) emailBadge.textContent = window.api.getEmails().length;
   }
   
-  // ----- API actions -----
-  window.deleteTask = async function(taskId) {
-    if (!confirm('Delete this task permanently?')) return;
-    try {
-      await window.api.deleteTask(taskId);
-      if (typeof AlarmSystem !== 'undefined') AlarmSystem.stopAlarm(taskId);
-      await loadTasks();
-      Utils.showToast('Task deleted', 'error');
-    } catch (err) {
-      Utils.showToast(err.message, 'error');
-    }
-  };
-  
-  window.completeTask = async function(taskId) {
-    try {
-      await window.api.updateTask(taskId, { isCompleted: true, alarmTriggered: false });
-      if (typeof AlarmSystem !== 'undefined') AlarmSystem.stopAlarm(taskId);
-      await loadTasks();
-      Utils.showToast('Task completed!', 'success');
-    } catch (err) {
-      Utils.showToast(err.message, 'error');
-    }
-  };
-  
-  window.deleteCompletedTask = async function(taskId) {
-    if (!confirm('Delete completed task?')) return;
-    try {
-      await window.api.deleteTask(taskId);
-      await loadTasks();
-      Utils.showToast('Task removed', 'error');
-    } catch (err) {
-      Utils.showToast(err.message, 'error');
-    }
-  };
-  
-  window.deleteMissedTask = async function(taskId) {
-    if (!confirm('Delete missed task?')) return;
-    try {
-      await window.api.deleteTask(taskId);
-      await loadTasks();
-      Utils.showToast('Missed task deleted', 'error');
-    } catch (err) {
-      Utils.showToast(err.message, 'error');
-    }
-  };
-  
-  window.deleteEmailEntry = function(timestamp) {
-    if (confirm('Delete this email record?')) {
-      window.api.deleteEmail(timestamp);
-      renderEmailsPage();
-      updateBadges();
-      Utils.showToast('Email deleted', 'error');
-    }
-  };
-  
-  // Render pages
+  // Render functions (same as before – keep them)
   function renderTasksPage() {
     if (!tasksList) return;
     const pending = tasks.filter(t => !t.isCompleted && !t.isMissed).sort((a,b)=>new Date(a.scheduledTime)-new Date(b.scheduledTime));
@@ -277,7 +253,62 @@
     else if (currentPage === 'emails') renderEmailsPage();
   }
   
-  // ✅ Create task with FIXED timezone handling (no more early alarms)
+  // API actions (delete, complete, etc. – same as before)
+  window.deleteTask = async function(taskId) {
+    if (!confirm('Delete this task permanently?')) return;
+    try {
+      await window.api.deleteTask(taskId);
+      if (typeof AlarmSystem !== 'undefined') AlarmSystem.stopAlarm(taskId);
+      await loadTasks();
+      Utils.showToast('Task deleted', 'error');
+    } catch (err) {
+      Utils.showToast(err.message, 'error');
+    }
+  };
+  
+  window.completeTask = async function(taskId) {
+    try {
+      await window.api.updateTask(taskId, { isCompleted: true, alarmTriggered: false });
+      if (typeof AlarmSystem !== 'undefined') AlarmSystem.stopAlarm(taskId);
+      await loadTasks();
+      Utils.showToast('Task completed!', 'success');
+    } catch (err) {
+      Utils.showToast(err.message, 'error');
+    }
+  };
+  
+  window.deleteCompletedTask = async function(taskId) {
+    if (!confirm('Delete completed task?')) return;
+    try {
+      await window.api.deleteTask(taskId);
+      await loadTasks();
+      Utils.showToast('Task removed', 'error');
+    } catch (err) {
+      Utils.showToast(err.message, 'error');
+    }
+  };
+  
+  window.deleteMissedTask = async function(taskId) {
+    if (!confirm('Delete missed task?')) return;
+    try {
+      await window.api.deleteTask(taskId);
+      await loadTasks();
+      Utils.showToast('Missed task deleted', 'error');
+    } catch (err) {
+      Utils.showToast(err.message, 'error');
+    }
+  };
+  
+  window.deleteEmailEntry = function(timestamp) {
+    if (confirm('Delete this email record?')) {
+      window.api.deleteEmail(timestamp);
+      renderEmailsPage();
+      updateBadges();
+      Utils.showToast('Email deleted', 'error');
+    }
+  };
+  
+  // Create task with timezone fix
   if (taskForm) {
     taskForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -285,21 +316,14 @@
       const dateTime = document.getElementById('taskDateTime').value;
       const description = document.getElementById('taskDesc').value;
       if (!title || !dateTime) return Utils.showToast('Title and time required', 'error');
-      
-      // Convert local datetime string to a Date object
       const localDate = new Date(dateTime);
-      // Check if the selected time is in the future (local time)
       if (localDate <= new Date()) {
         Utils.showToast('Future time required', 'error');
         return;
       }
-      
-      // ✅ CRITICAL FIX: Store the UTC equivalent of the local time so that when compared
-      // with new Date() (local) later, the difference is correct.
-      // localDate.getTimezoneOffset() returns offset in minutes (e.g., -300 for UTC+5)
+      // Store UTC equivalent of local time
       const utcTimestamp = localDate.getTime() - (localDate.getTimezoneOffset() * 60000);
       const scheduledTime = new Date(utcTimestamp).toISOString();
-      
       try {
         await window.api.createTask({ title, description, scheduledTime });
         await loadTasks();
@@ -367,7 +391,7 @@
   updateTime();
   setInterval(updateTime, 1000);
   
-  // ================= RINGTONE MODAL (no toast on file selection, only on save) =================
+  // Ringtone modal (same as before)
   const ringtoneBtn = document.getElementById('ringtoneSettingsBtn');
   const modal = document.getElementById('ringtoneModal');
   const ringtoneFile = document.getElementById('ringtoneFileInput');
@@ -453,6 +477,15 @@
     if (modal && e.target === modal) modal.style.display = 'none';
   });
   updateRingtoneDisplay();
+  
+  // ✅ Start the alarm checker (runs every second)
+  if (typeof AlarmSystem !== 'undefined') {
+    AlarmSystem.startChecker(() => {
+      checkAlarms();        // frontend polling
+      updateBadges();
+      if (currentPage === 'alarms') renderAlarmsPage();
+    });
+  }
   
   loadTasks();
   initSocket();
