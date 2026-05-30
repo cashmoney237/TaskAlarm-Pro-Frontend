@@ -169,44 +169,31 @@ const AlarmSystem = {
   },
 
   // ✅ Email via EmailJS (with debug logs)
-  sendEmailNotification(userEmail, userName, taskTitle, taskDescription, scheduledTime) {
+sendEmailNotification(userEmail, userName, taskTitle, taskDescription, scheduledTime) {
     const formattedTime = new Date(scheduledTime).toLocaleString();
-    console.log('📧 sendEmailNotification called');
-    console.log('   to:', userEmail);
-    console.log('   task:', taskTitle);
-    
-    // Check if EmailJS is loaded
     if (typeof emailjs === 'undefined') {
-      console.error('❌ EmailJS not loaded! Check script tag in HTML.');
-      return;
+        console.error('EmailJS not loaded');
+        return;
     }
-    
-    // Initialize EmailJS (public key)
-    emailjs.init('koAqVQ3gTxbRn-QKI');
-    console.log('📧 EmailJS initialized');
-    
-    // Send email
+    emailjs.init('_6ofriLd4GncXrS6O');  // your public key
     emailjs.send('service_95zfcl8', 'template_5w0r0mg', {
-      to_email: userEmail,
-      to_name: userName,
-      task_title: taskTitle,
-      task_description: taskDescription || 'No description',
-      task_time: formattedTime
+        to_email: userEmail,
+        to_name: userName,
+        task_title: taskTitle,
+        task_description: taskDescription || '',
+        task_time: formattedTime
     }).then(() => {
-      console.log('✅ EmailJS: Email sent successfully to', userEmail);
-      // Store in local history
-      if (typeof addEmail !== 'undefined') {
-        addEmail({
-          to: userEmail,
-          subject: `⏰ Task Reminder: ${taskTitle}`,
-          body: `Hello ${userName},\n\nYour task "${taskTitle}" is due at ${formattedTime}.\nDescription: ${taskDescription || 'None'}`
-        });
-        console.log('📧 Email stored in local history');
-      }
-    }).catch(err => {
-      console.error('❌ EmailJS error:', err);
-    });
-  },
+        console.log('Email sent via EmailJS');
+        // optional: store in localStorage history
+        if (typeof addEmail !== 'undefined') {
+            addEmail({
+                to: userEmail,
+                subject: `Task Reminder: ${taskTitle}`,
+                body: `Your task "${taskTitle}" is due at ${formattedTime}.`
+            });
+        }
+    }).catch(err => console.error('EmailJS error:', err));
+},
 
   startChecker(callback) {
     if (this.checkerInterval) clearInterval(this.checkerInterval);
