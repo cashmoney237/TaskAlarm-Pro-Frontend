@@ -2,13 +2,14 @@
   const currentUser = window.api.getCurrentUser();
   if (!currentUser) { window.location.href = 'login.html'; return; }
   
+  window.allTasks = []; // expose globally for debugging
   let tasks = [];
   let currentPage = 'tasks';
   let socket = null;
   let customRingtoneBlobUrl = null;
   let selectedAudioFile = null;
   
-  // DOM elements (same as before – keep your existing)
+  // DOM elements (keep yours – they work)
   const userName = document.getElementById('userName');
   const userEmail = document.getElementById('userEmail');
   const userAvatar = document.getElementById('userAvatar');
@@ -38,26 +39,34 @@
   
   if (typeof AlarmSystem !== 'undefined') AlarmSystem.init(null);
   
-  // ✅ CRITICAL: Check alarms every second (frontend polling)
+  // ========= ALARM CHECKER =========
   function checkAlarms() {
     const now = new Date();
     const nowTime = now.getTime();
+    let anyTriggered = false;
     
     tasks.forEach(task => {
       if (task.isCompleted || task.isMissed) return;
       
       const taskTime = new Date(task.scheduledTime).getTime();
-      const timeDiff = Math.abs(nowTime - taskTime);
+      const timeDiff = nowTime - taskTime; // positive if overdue
       
-      // Trigger if within 3 seconds of scheduled time and not already triggered
-      if (!task.alarmTriggered && timeDiff < 3000 && nowTime >= taskTime) {
+      // Log every few seconds (avoid console spam)
+      if (Math.floor(nowTime / 5000) !== Math.floor((nowTime-1000)/5000)) {
+        console.log(`[${now.toLocaleTimeString()}] Task "${task.title}" scheduled at ${new Date(task.scheduledTime).toLocaleTimeString()}, diff=${timeDiff}ms, triggered=${task.alarmTriggered}`);
+      }
+      
+      // Trigger if within 3 seconds of scheduled time OR overdue but not triggered yet
+      if (!task.alarmTriggered && (Math.abs(timeDiff) < 3000 || (timeDiff > 0 && timeDiff < 60000))) {
+        console.log(`🔥 TRIGGERING alarm for "${task.title}" (diff=${timeDiff}ms)`);
         task.alarmTriggered = true;
+        anyTriggered = true;
         
-        // Update in backend
+        // Update backend
         window.api.updateTask(task._id, { alarmTriggered: true })
-          .catch(err => console.error('Failed to update alarm triggered:', err));
+          .catch(err => console.error('Update failed:', err));
         
-        // Send email notification (via EmailJS or backend)
+        // Send email (via frontend EmailJS or backend)
         if (typeof AlarmSystem !== 'undefined') {
           AlarmSystem.sendEmailNotification(
             currentUser.email,
@@ -66,17 +75,23 @@
             task.description,
             task.scheduledTime
           );
-          // Start the alarm sound
           AlarmSystem.startAlarmCycle(task, () => loadTasks());
         }
         
         Utils.showToast(`🔔 "${task.title}" is due!`, 'warning');
-        // Refresh tasks list to update badge
+        // Refresh tasks to update badge and active alarms page
         loadTasks();
+        break; // only trigger one at a time
       }
     });
+    
+    if (anyTriggered) {
+      updateBadges();
+      if (currentPage === 'alarms') renderAlarmsPage();
+    }
   }
   
+  // ========= SOCKET (optional) =========
   function initSocket() {
     if (!socket && currentUser && typeof io !== 'undefined') {
       socket = io('https://elumbemikelawrce.onrender.com', {
@@ -85,25 +100,23 @@
       });
       socket.on('connect_error', (err) => console.log('Socket error:', err.message));
       socket.on('task_due', (data) => {
-        // Socket event is a backup – we also have checkAlarms
-        console.log('Received task_due from server', data);
+        console.log('Socket task_due received', data);
         if (typeof AlarmSystem !== 'undefined') {
           AlarmSystem.startAlarmCycle(data, () => loadTasks());
         }
         loadTasks();
       });
-      socket.on('task_missed', (data) => {
-        Utils.showToast(`⏰ "${data.title}" was missed`, 'warning');
-        loadTasks();
-      });
     }
   }
   
+  // ========= LOAD TASKS =========
   async function loadTasks() {
     try {
       tasks = await window.api.getTasks();
+      window.allTasks = tasks; // global for debugging
       renderCurrentPage();
       updateBadges();
+      console.log(`Loaded ${tasks.length} tasks`);
     } catch (err) {
       console.error(err);
       Utils.showToast('Failed to load tasks', 'error');
@@ -118,7 +131,7 @@
     if (emailBadge) emailBadge.textContent = window.api.getEmails().length;
   }
   
-  // Render functions (same as before – keep them)
+  // ========= RENDER FUNCTIONS (keep yours – they work) =========
   function renderTasksPage() {
     if (!tasksList) return;
     const pending = tasks.filter(t => !t.isCompleted && !t.isMissed).sort((a,b)=>new Date(a.scheduledTime)-new Date(b.scheduledTime));
@@ -253,7 +266,7 @@
     else if (currentPage === 'emails') renderEmailsPage();
   }
   
-  // API actions (delete, complete, etc. – same as before)
+  // ========= API ACTIONS (delete, complete, etc.) =========
   window.deleteTask = async function(taskId) {
     if (!confirm('Delete this task permanently?')) return;
     try {
@@ -308,7 +321,7 @@
     }
   };
   
-  // Create task with timezone fix
+  // ========= CREATE TASK (with timezone fix) =========
   if (taskForm) {
     taskForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -321,7 +334,7 @@
         Utils.showToast('Future time required', 'error');
         return;
       }
-      // Store UTC equivalent of local time
+      // Convert local time to UTC timestamp
       const utcTimestamp = localDate.getTime() - (localDate.getTimezoneOffset() * 60000);
       const scheduledTime = new Date(utcTimestamp).toISOString();
       try {
@@ -335,7 +348,7 @@
     });
   }
   
-  // Navigation
+  // ========= NAVIGATION =========
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', (e) => {
       e.preventDefault();
@@ -353,7 +366,7 @@
     });
   });
   
-  // Logout
+  // ========= LOGOUT =========
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
       if (typeof AlarmSystem !== 'undefined') AlarmSystem.stopAllAlarms();
@@ -363,7 +376,7 @@
     });
   }
   
-  // Mobile menu
+  // ========= MOBILE MENU =========
   function closeSidebar() { if (sidebar) sidebar.classList.remove('mobile-open'); }
   if (mobileMenuBtn && sidebar) mobileMenuBtn.addEventListener('click', () => sidebar.classList.add('mobile-open'));
   if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', closeSidebar);
@@ -371,10 +384,8 @@
     if (sidebar && mobileMenuBtn && sidebar.classList.contains('mobile-open') && !sidebar.contains(e.target) && !mobileMenuBtn.contains(e.target)) closeSidebar();
   });
   
-  // Refresh button
+  // ========= REFRESH & CLEAR EMAILS =========
   if (refreshBtn) refreshBtn.addEventListener('click', () => { loadTasks(); Utils.showToast('Refreshed', 'info'); });
-  
-  // Clear all emails
   if (clearAllEmailsBtn) {
     clearAllEmailsBtn.addEventListener('click', () => {
       if (confirm('Delete ALL email history?')) {
@@ -386,12 +397,12 @@
     });
   }
   
-  // Update time
+  // ========= CLOCK =========
   function updateTime() { if (currentTimeEl) currentTimeEl.textContent = new Date().toLocaleString(); }
   updateTime();
   setInterval(updateTime, 1000);
   
-  // Ringtone modal (same as before)
+  // ========= RINGTONE MODAL (unchanged) =========
   const ringtoneBtn = document.getElementById('ringtoneSettingsBtn');
   const modal = document.getElementById('ringtoneModal');
   const ringtoneFile = document.getElementById('ringtoneFileInput');
@@ -478,13 +489,16 @@
   });
   updateRingtoneDisplay();
   
-  // ✅ Start the alarm checker (runs every second)
+  // ========= START ALARM CHECKER =========
   if (typeof AlarmSystem !== 'undefined') {
     AlarmSystem.startChecker(() => {
-      checkAlarms();        // frontend polling
+      checkAlarms();           // ← this is the key
       updateBadges();
       if (currentPage === 'alarms') renderAlarmsPage();
     });
+    console.log('Alarm checker started');
+  } else {
+    console.error('AlarmSystem not loaded!');
   }
   
   loadTasks();
