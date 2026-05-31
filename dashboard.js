@@ -1,10 +1,9 @@
 (function() {
   const currentUser = window.api.getCurrentUser();
-  if (!currentUser) { window.location.href = 'login.html'; return; }
+  if (!currentUser) { window.location.href = 'index.html'; return; }
   
   let tasks = [];
   let currentPage = 'tasks';
-  let socket = null;
   let customRingtoneBlobUrl = null;
   let selectedAudioFile = null;
   
@@ -38,13 +37,12 @@
   
   if (typeof AlarmSystem !== 'undefined') AlarmSystem.init(null);
   
-  // ========= ALARM CHECKER (fixed, no illegal break) =========
+  // ========= ALARM CHECKER (polling every second) =========
   function checkAlarms() {
     const now = new Date();
     const nowTime = now.getTime();
     let triggered = false;
     
-    // Use a simple for loop to avoid break issues
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
       if (task.isCompleted || task.isMissed) continue;
@@ -74,35 +72,12 @@
         }
         
         Utils.showToast(`🔔 "${task.title}" is due!`, 'warning');
-        // Only trigger one per check to avoid overlapping sounds
-        break;
+        break; // only trigger one per check
       }
     }
     
     if (triggered) {
-      loadTasks(); // refresh to update badges and active alarms list
-    }
-  }
-  
-  // ========= SOCKET (optional) =========
-  function initSocket() {
-    if (!socket && currentUser && typeof io !== 'undefined') {
-      socket = io('https://elumbemikelawrce.onrender.com', {
-        auth: { token: currentUser.id },
-        transports: ['websocket', 'polling']
-      });
-      socket.on('connect_error', (err) => console.log('Socket error:', err.message));
-      socket.on('task_due', (data) => {
-        console.log('Socket task_due received', data);
-        if (typeof AlarmSystem !== 'undefined') {
-          AlarmSystem.startAlarmCycle(data, () => loadTasks());
-        }
-        loadTasks();
-      });
-      socket.on('task_missed', (data) => {
-        Utils.showToast(`⏰ "${data.title}" was missed`, 'warning');
-        loadTasks();
-      });
+      loadTasks(); // refresh badges and lists
     }
   }
   
@@ -126,7 +101,7 @@
     if (emailBadge) emailBadge.textContent = window.api.getEmails().length;
   }
   
-  // ========= RENDER FUNCTIONS (keep your existing ones – they work) =========
+  // ========= RENDER FUNCTIONS =========
   function renderTasksPage() {
     if (!tasksList) return;
     const pending = tasks.filter(t => !t.isCompleted && !t.isMissed).sort((a,b)=>new Date(a.scheduledTime)-new Date(b.scheduledTime));
@@ -316,7 +291,7 @@
     }
   };
   
-  // ========= CREATE TASK (with timezone fix) =========
+  // ========= CREATE TASK (timezone fix) =========
   if (taskForm) {
     taskForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -365,9 +340,8 @@
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
       if (typeof AlarmSystem !== 'undefined') AlarmSystem.stopAllAlarms();
-      if (socket) socket.disconnect();
       window.api.logout();
-      window.location.href = 'login.html';
+      window.location.href = 'index.html';
     });
   }
   
@@ -397,7 +371,7 @@
   updateTime();
   setInterval(updateTime, 1000);
   
-  // ========= RINGTONE MODAL (unchanged – keep yours) =========
+  // ========= RINGTONE MODAL =========
   const ringtoneBtn = document.getElementById('ringtoneSettingsBtn');
   const modal = document.getElementById('ringtoneModal');
   const ringtoneFile = document.getElementById('ringtoneFileInput');
@@ -497,5 +471,6 @@
   }
   
   loadTasks();
-  // initSocket();
+  // ========= WEBSOCKET DISABLED – alarms work via polling =========
+  // initSocket();   // <-- COMMENTED OUT
 })();
