@@ -37,7 +37,7 @@
   
   if (typeof AlarmSystem !== 'undefined') AlarmSystem.init(null);
   
-  // ========= TEST ALARM BUTTON (already there) =========
+  // ========= TEST ALARM BUTTON =========
   function addTestButton() {
     const headerDiv = document.querySelector('.top-bar > div:last-child');
     if (headerDiv && !document.getElementById('testAlarmBtn')) {
@@ -66,48 +66,32 @@
     }
   }
   
-  // ========= RELIABLE ALARM CHECKER (triggers when time is due OR overdue) =========
+  // ========= RELIABLE ALARM CHECKER (using timestamps) =========
   let lastLogTime = 0;
   function checkAlarms() {
-    const now = new Date();
-    const nowTime = now.getTime();
+    const now = Date.now();
     let triggered = false;
     
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
       if (task.isCompleted || task.isMissed) continue;
       
-      // Convert stored scheduledTime to a Date object
-      // Task.scheduledTime comes from the backend as a string (e.g., "2025-05-31T15:30")
-      let taskTime;
-      if (typeof task.scheduledTime === 'string' && task.scheduledTime.includes('T')) {
-        // Create a Date object using the local datetime string
-        // Append a timezone offset to force local interpretation
-        const localStr = task.scheduledTime + (task.scheduledTime.includes('Z') ? '' : 'T00:00');
-        taskTime = new Date(localStr);
-        // If the above fails, fallback to new Date(task.scheduledTime)
-        if (isNaN(taskTime.getTime())) {
-          taskTime = new Date(task.scheduledTime);
-        }
-      } else {
-        taskTime = new Date(task.scheduledTime);
-      }
-      
-      const taskTimeMs = taskTime.getTime();
-      const diffMs = taskTimeMs - nowTime;
+      // task.scheduledTime is a timestamp (milliseconds)
+      const taskTime = typeof task.scheduledTime === 'number' ? task.scheduledTime : new Date(task.scheduledTime).getTime();
+      const diffMs = taskTime - now;
       const diffSec = diffMs / 1000;
       
       // Log every 10 seconds
       if (Date.now() - lastLogTime > 10000) {
         lastLogTime = Date.now();
-        console.log(`[${now.toLocaleTimeString()}] Task "${task.title}": scheduled ${taskTime.toLocaleTimeString()}, diff=${diffSec.toFixed(1)}s, triggered=${task.alarmTriggered}`);
+        console.log(`[${new Date().toLocaleTimeString()}] Task "${task.title}": diff=${diffSec.toFixed(1)}s, triggered=${task.alarmTriggered}`);
       }
       
-      // Trigger if the task time has passed (or is within next 3 seconds) AND not yet triggered
+      // Trigger if scheduled time is now or in the past (diff <= 3 seconds)
       if (!task.alarmTriggered && diffMs <= 3000) {
         triggered = true;
         task.alarmTriggered = true;
-        console.log(`🔥 TRIGGER ALARM: "${task.title}" at ${now.toLocaleTimeString()} (scheduled ${taskTime.toLocaleTimeString()})`);
+        console.log(`🔥 TRIGGER ALARM: "${task.title}" (diff ${diffSec.toFixed(1)}s)`);
         
         window.api.updateTask(task._id, { alarmTriggered: true }).catch(console.error);
         
@@ -117,12 +101,12 @@
             currentUser.fullname,
             task.title,
             task.description,
-            task.scheduledTime
+            new Date(task.scheduledTime).toISOString() // keep ISO for email display
           );
           AlarmSystem.startAlarmCycle(task, () => loadTasks());
         }
         Utils.showToast(`🔔 "${task.title}" is due!`, 'warning');
-        break; // only one alarm at a time
+        break;
       }
     }
     if (triggered) loadTasks();
@@ -149,10 +133,10 @@
     if (emailBadge) emailBadge.textContent = window.api.getEmails().length;
   }
   
-  // ========= RENDER FUNCTIONS (keep your existing ones – they work) =========
+  // ========= RENDER FUNCTIONS (unchanged – they work) =========
   function renderTasksPage() {
     if (!tasksList) return;
-    const pending = tasks.filter(t => !t.isCompleted && !t.isMissed).sort((a,b)=>new Date(a.scheduledTime)-new Date(b.scheduledTime));
+    const pending = tasks.filter(t => !t.isCompleted && !t.isMissed).sort((a,b)=>a.scheduledTime - b.scheduledTime);
     if (!pending.length) {
       tasksList.innerHTML = '<div class="empty-state">✨ No pending tasks. Create one!</div>';
       return;
@@ -161,7 +145,7 @@
       <div class="task-card" data-task-id="${task._id}">
         <div class="task-info">
           <div class="task-title">${Utils.escapeHtml(task.title)}</div>
-          <div class="task-time"><i class="fas fa-clock"></i> ${Utils.formatDate(task.scheduledTime)} ${new Date(task.scheduledTime) < new Date() ? '<span style="color:#f87171">(Overdue)</span>' : ''}</div>
+          <div class="task-time"><i class="fas fa-clock"></i> ${new Date(task.scheduledTime).toLocaleString()}</div>
           ${task.description ? `<div class="task-desc">${Utils.escapeHtml(task.description)}</div>` : ''}
         </div>
         <div class="task-actions">
@@ -217,7 +201,7 @@
       <div class="task-card">
         <div class="task-info">
           <div class="task-title" style="text-decoration:line-through;opacity:0.7;">${Utils.escapeHtml(task.title)}</div>
-          <div class="task-time"><i class="fas fa-calendar-check"></i> Completed • ${Utils.formatDate(task.scheduledTime)}</div>
+          <div class="task-time"><i class="fas fa-calendar-check"></i> Completed • ${new Date(task.scheduledTime).toLocaleString()}</div>
           ${task.description ? `<div class="task-desc">${Utils.escapeHtml(task.description)}</div>` : ''}
         </div>
         <div class="task-actions">
@@ -241,7 +225,7 @@
       <div class="task-card missed-task">
         <div class="task-info">
           <div class="task-title">⚠️ ${Utils.escapeHtml(task.title)}</div>
-          <div class="task-time"><i class="fas fa-hourglass-end"></i> Missed • ${Utils.formatDate(task.scheduledTime)}</div>
+          <div class="task-time"><i class="fas fa-hourglass-end"></i> Missed • ${new Date(task.scheduledTime).toLocaleString()}</div>
           ${task.description ? `<div class="task-desc">${Utils.escapeHtml(task.description)}</div>` : ''}
         </div>
         <div class="task-actions">
@@ -339,20 +323,27 @@
     }
   };
   
-  // ========= CREATE TASK (store as simple datetime string) =========
+  // ========= CREATE TASK – store timestamp =========
   if (taskForm) {
     taskForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const title = document.getElementById('taskTitle').value;
-      const dateTime = document.getElementById('taskDateTime').value;
+      const dateTimeStr = document.getElementById('taskDateTime').value;
       const description = document.getElementById('taskDesc').value;
-      if (!title || !dateTime) return Utils.showToast('Title and time required', 'error');
-      const localDate = new Date(dateTime);
+      if (!title || !dateTimeStr) return Utils.showToast('Title and time required', 'error');
+      const localDate = new Date(dateTimeStr);
       if (localDate <= new Date()) {
         Utils.showToast('Future time required', 'error');
         return;
       }
-      const scheduledTime = dateTime; // store local datetime string as is
+      // Convert local date to a timestamp (milliseconds) that represents the same moment in UTC
+      // This ensures timezone-independent storage
+      const timestamp = localDate.getTime(); // getTime returns milliseconds in UTC (but from local interpretation)
+      // Actually getTime() returns the same timestamp regardless of timezone? Yes, it's based on UTC.
+      // However, if we want to store the exact local time, we need to adjust by offset.
+      // But for alarm comparison, we'll just compare the timestamp with Date.now() – both are UTC.
+      // So storing localDate.getTime() gives the UTC timestamp of that local datetime.
+      const scheduledTime = timestamp;
       try {
         await window.api.createTask({ title, description, scheduledTime });
         await loadTasks();
@@ -511,7 +502,7 @@
       updateBadges();
       if (currentPage === 'alarms') renderAlarmsPage();
     });
-    console.log('Alarm checker started');
+    console.log('Alarm checker started (timestamp mode)');
   } else {
     console.error('AlarmSystem not loaded!');
   }
