@@ -48,23 +48,12 @@ function getCurrentUser() {
     return user ? JSON.parse(user) : null;
 }
 
-async function apiGetTasks() {
-    return apiRequest('/tasks', 'GET');
-}
+async function apiGetTasks() { return apiRequest('/tasks', 'GET'); }
+async function apiCreateTask(task) { return apiRequest('/tasks', 'POST', task); }
+async function apiUpdateTask(taskId, updates) { return apiRequest(`/tasks/${taskId}`, 'PUT', updates); }
+async function apiDeleteTask(taskId) { return apiRequest(`/tasks/${taskId}`, 'DELETE'); }
 
-async function apiCreateTask(task) {
-    return apiRequest('/tasks', 'POST', task);
-}
-
-async function apiUpdateTask(taskId, updates) {
-    return apiRequest(`/tasks/${taskId}`, 'PUT', updates);
-}
-
-async function apiDeleteTask(taskId) {
-    return apiRequest(`/tasks/${taskId}`, 'DELETE');
-}
-
-// Email history functions (still use localStorage – no change)
+// Email history (localStorage)
 function getEmails() {
     const user = getCurrentUser();
     if (!user) return [];
