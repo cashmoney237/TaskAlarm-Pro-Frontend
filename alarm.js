@@ -168,12 +168,9 @@ const AlarmSystem = {
     this.resetToDefault();
   },
 
-  // ✅ Email: store locally (no EmailJS) – history will work
   sendEmailNotification(userEmail, userName, taskTitle, taskDescription, scheduledTime) {
     const formattedTime = new Date(scheduledTime).toLocaleString();
     console.log(`📧 [DEMO] Email would be sent to ${userEmail} for task "${taskTitle}" at ${formattedTime}`);
-    
-    // Store in local history so Email History page shows it
     if (typeof addEmail !== 'undefined') {
       addEmail({
         to: userEmail,

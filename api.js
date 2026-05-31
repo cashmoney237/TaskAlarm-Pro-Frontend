@@ -1,3 +1,4 @@
+// API base URL – point to your Render backend
 const API_URL = 'https://elumbemikelawrce.onrender.com/api';
 
 let authToken = localStorage.getItem('token');
@@ -48,10 +49,21 @@ function getCurrentUser() {
     return user ? JSON.parse(user) : null;
 }
 
-async function apiGetTasks() { return apiRequest('/tasks', 'GET'); }
-async function apiCreateTask(task) { return apiRequest('/tasks', 'POST', task); }
-async function apiUpdateTask(taskId, updates) { return apiRequest(`/tasks/${taskId}`, 'PUT', updates); }
-async function apiDeleteTask(taskId) { return apiRequest(`/tasks/${taskId}`, 'DELETE'); }
+async function apiGetTasks() {
+    return apiRequest('/tasks', 'GET');
+}
+
+async function apiCreateTask(task) {
+    return apiRequest('/tasks', 'POST', task);
+}
+
+async function apiUpdateTask(taskId, updates) {
+    return apiRequest(`/tasks/${taskId}`, 'PUT', updates);
+}
+
+async function apiDeleteTask(taskId) {
+    return apiRequest(`/tasks/${taskId}`, 'DELETE');
+}
 
 // Email history (localStorage)
 function getEmails() {

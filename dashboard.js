@@ -1,6 +1,6 @@
 (function() {
   const currentUser = window.api.getCurrentUser();
-  if (!currentUser) { window.location.href = 'index.html'; return; }
+  if (!currentUser) { window.location.href = 'login.html'; return; }
   
   let tasks = [];
   let currentPage = 'tasks';
@@ -37,7 +37,7 @@
   
   if (typeof AlarmSystem !== 'undefined') AlarmSystem.init(null);
   
-  // ========= TEST ALARM BUTTON =========
+  // Test alarm button
   function addTestButton() {
     const headerDiv = document.querySelector('.top-bar > div:last-child');
     if (headerDiv && !document.getElementById('testAlarmBtn')) {
@@ -66,42 +66,33 @@
     }
   }
   
-  // ========= RELIABLE ALARM CHECKER (using timestamps) =========
+  // Alarm checker (timestamp based)
   let lastLogTime = 0;
   function checkAlarms() {
     const now = Date.now();
     let triggered = false;
-    
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
       if (task.isCompleted || task.isMissed) continue;
-      
-      // task.scheduledTime is a timestamp (milliseconds)
       const taskTime = typeof task.scheduledTime === 'number' ? task.scheduledTime : new Date(task.scheduledTime).getTime();
       const diffMs = taskTime - now;
       const diffSec = diffMs / 1000;
-      
-      // Log every 10 seconds
       if (Date.now() - lastLogTime > 10000) {
         lastLogTime = Date.now();
         console.log(`[${new Date().toLocaleTimeString()}] Task "${task.title}": diff=${diffSec.toFixed(1)}s, triggered=${task.alarmTriggered}`);
       }
-      
-      // Trigger if scheduled time is now or in the past (diff <= 3 seconds)
       if (!task.alarmTriggered && diffMs <= 3000) {
         triggered = true;
         task.alarmTriggered = true;
         console.log(`🔥 TRIGGER ALARM: "${task.title}" (diff ${diffSec.toFixed(1)}s)`);
-        
         window.api.updateTask(task._id, { alarmTriggered: true }).catch(console.error);
-        
         if (typeof AlarmSystem !== 'undefined') {
           AlarmSystem.sendEmailNotification(
             currentUser.email,
             currentUser.fullname,
             task.title,
             task.description,
-            new Date(task.scheduledTime).toISOString() // keep ISO for email display
+            task.scheduledTime
           );
           AlarmSystem.startAlarmCycle(task, () => loadTasks());
         }
@@ -112,7 +103,6 @@
     if (triggered) loadTasks();
   }
   
-  // ========= LOAD TASKS =========
   async function loadTasks() {
     try {
       tasks = await window.api.getTasks();
@@ -133,7 +123,7 @@
     if (emailBadge) emailBadge.textContent = window.api.getEmails().length;
   }
   
-  // ========= RENDER FUNCTIONS (unchanged – they work) =========
+  // Render functions (keep your existing ones – they work)
   function renderTasksPage() {
     if (!tasksList) return;
     const pending = tasks.filter(t => !t.isCompleted && !t.isMissed).sort((a,b)=>a.scheduledTime - b.scheduledTime);
@@ -268,7 +258,7 @@
     else if (currentPage === 'emails') renderEmailsPage();
   }
   
-  // ========= API ACTIONS =========
+  // API actions
   window.deleteTask = async function(taskId) {
     if (!confirm('Delete this task permanently?')) return;
     try {
@@ -323,7 +313,7 @@
     }
   };
   
-  // ========= CREATE TASK – store timestamp =========
+  // Create task (store as timestamp)
   if (taskForm) {
     taskForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -336,14 +326,7 @@
         Utils.showToast('Future time required', 'error');
         return;
       }
-      // Convert local date to a timestamp (milliseconds) that represents the same moment in UTC
-      // This ensures timezone-independent storage
-      const timestamp = localDate.getTime(); // getTime returns milliseconds in UTC (but from local interpretation)
-      // Actually getTime() returns the same timestamp regardless of timezone? Yes, it's based on UTC.
-      // However, if we want to store the exact local time, we need to adjust by offset.
-      // But for alarm comparison, we'll just compare the timestamp with Date.now() – both are UTC.
-      // So storing localDate.getTime() gives the UTC timestamp of that local datetime.
-      const scheduledTime = timestamp;
+      const scheduledTime = localDate.getTime(); // store as timestamp
       try {
         await window.api.createTask({ title, description, scheduledTime });
         await loadTasks();
@@ -355,7 +338,7 @@
     });
   }
   
-  // ========= NAVIGATION =========
+  // Navigation
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', (e) => {
       e.preventDefault();
@@ -373,16 +356,16 @@
     });
   });
   
-  // ========= LOGOUT =========
+  // Logout (redirect to login.html)
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
       if (typeof AlarmSystem !== 'undefined') AlarmSystem.stopAllAlarms();
       window.api.logout();
-      window.location.href = 'index.html';
+      window.location.href = 'login.html';
     });
   }
   
-  // ========= MOBILE MENU =========
+  // Mobile menu
   function closeSidebar() { if (sidebar) sidebar.classList.remove('mobile-open'); }
   if (mobileMenuBtn && sidebar) mobileMenuBtn.addEventListener('click', () => sidebar.classList.add('mobile-open'));
   if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', closeSidebar);
@@ -390,7 +373,7 @@
     if (sidebar && mobileMenuBtn && sidebar.classList.contains('mobile-open') && !sidebar.contains(e.target) && !mobileMenuBtn.contains(e.target)) closeSidebar();
   });
   
-  // ========= REFRESH & CLEAR EMAILS =========
+  // Refresh & clear emails
   if (refreshBtn) refreshBtn.addEventListener('click', () => { loadTasks(); Utils.showToast('Refreshed', 'info'); });
   if (clearAllEmailsBtn) {
     clearAllEmailsBtn.addEventListener('click', () => {
@@ -403,12 +386,12 @@
     });
   }
   
-  // ========= CLOCK =========
+  // Clock
   function updateTime() { if (currentTimeEl) currentTimeEl.textContent = new Date().toLocaleString(); }
   updateTime();
   setInterval(updateTime, 1000);
   
-  // ========= RINGTONE MODAL =========
+  // Ringtone modal (unchanged)
   const ringtoneBtn = document.getElementById('ringtoneSettingsBtn');
   const modal = document.getElementById('ringtoneModal');
   const ringtoneFile = document.getElementById('ringtoneFileInput');
@@ -495,7 +478,7 @@
   });
   updateRingtoneDisplay();
   
-  // ========= START ALARM CHECKER =========
+  // Start alarm checker
   if (typeof AlarmSystem !== 'undefined') {
     AlarmSystem.startChecker(() => {
       checkAlarms();
