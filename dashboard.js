@@ -7,7 +7,7 @@
   let customRingtoneBlobUrl = null;
   let selectedAudioFile = null;
   
-  // DOM elements
+  // DOM elements (keep your existing ones)
   const userName = document.getElementById('userName');
   const userEmail = document.getElementById('userEmail');
   const userAvatar = document.getElementById('userAvatar');
@@ -37,29 +37,44 @@
   
   if (typeof AlarmSystem !== 'undefined') AlarmSystem.init(null);
   
-  // ========= ALARM CHECKER (polling every second) =========
+  // ========= ALARM CHECKER with debug logs =========
+  let lastLogTime = 0;
   function checkAlarms() {
     const now = new Date();
     const nowTime = now.getTime();
     let triggered = false;
+    
+    // Log every 10 seconds to see task times
+    if (nowTime - lastLogTime > 10000) {
+      lastLogTime = nowTime;
+      console.log('=== Alarm Check at', now.toLocaleTimeString(), '===');
+      tasks.forEach(t => {
+        if (!t.isCompleted && !t.isMissed) {
+          const taskTime = new Date(t.scheduledTime).getTime();
+          const diff = (taskTime - nowTime) / 1000;
+          console.log(`  Task "${t.title}": scheduled ${new Date(t.scheduledTime).toLocaleTimeString()}, diff ${diff}s, triggered=${t.alarmTriggered}`);
+        }
+      });
+    }
     
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
       if (task.isCompleted || task.isMissed) continue;
       
       const taskTime = new Date(task.scheduledTime).getTime();
-      const timeDiff = nowTime - taskTime;
+      const timeDiffSec = (taskTime - nowTime) / 1000;
       
-      // Trigger if within 2 seconds of scheduled time or overdue less than 60 seconds
-      if (!task.alarmTriggered && (Math.abs(timeDiff) < 2000 || (timeDiff > 0 && timeDiff < 60000))) {
+      // Trigger if within 3 seconds of scheduled time (past or future)
+      if (!task.alarmTriggered && Math.abs(timeDiffSec) < 3) {
         triggered = true;
         task.alarmTriggered = true;
+        console.log(`🔥 TRIGGER ALARM: "${task.title}" at ${now.toLocaleTimeString()} (scheduled ${new Date(task.scheduledTime).toLocaleTimeString()})`);
         
         // Update backend
         window.api.updateTask(task._id, { alarmTriggered: true })
           .catch(err => console.error('Update failed:', err));
         
-        // Send email
+        // Send email and start sound
         if (typeof AlarmSystem !== 'undefined') {
           AlarmSystem.sendEmailNotification(
             currentUser.email,
@@ -72,12 +87,12 @@
         }
         
         Utils.showToast(`🔔 "${task.title}" is due!`, 'warning');
-        break; // only trigger one per check
+        break; // only one alarm at a time
       }
     }
     
     if (triggered) {
-      loadTasks(); // refresh badges and lists
+      loadTasks(); // refresh badges
     }
   }
   
@@ -87,6 +102,7 @@
       tasks = await window.api.getTasks();
       renderCurrentPage();
       updateBadges();
+      console.log(`Loaded ${tasks.length} tasks`);
     } catch (err) {
       console.error(err);
       Utils.showToast('Failed to load tasks', 'error');
@@ -101,7 +117,7 @@
     if (emailBadge) emailBadge.textContent = window.api.getEmails().length;
   }
   
-  // ========= RENDER FUNCTIONS =========
+  // ========= RENDER FUNCTIONS (keep your existing ones – they work) =========
   function renderTasksPage() {
     if (!tasksList) return;
     const pending = tasks.filter(t => !t.isCompleted && !t.isMissed).sort((a,b)=>new Date(a.scheduledTime)-new Date(b.scheduledTime));
@@ -371,7 +387,7 @@
   updateTime();
   setInterval(updateTime, 1000);
   
-  // ========= RINGTONE MODAL =========
+  // ========= RINGTONE MODAL (unchanged) =========
   const ringtoneBtn = document.getElementById('ringtoneSettingsBtn');
   const modal = document.getElementById('ringtoneModal');
   const ringtoneFile = document.getElementById('ringtoneFileInput');
@@ -471,6 +487,5 @@
   }
   
   loadTasks();
-  // ========= WEBSOCKET DISABLED – alarms work via polling =========
-  // initSocket();   // <-- COMMENTED OUT
+  // WebSocket disabled – alarms work via polling
 })();
