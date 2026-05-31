@@ -497,5 +497,5 @@
   }
   
   loadTasks();
-  initSocket();
+  // initSocket();
 })();
