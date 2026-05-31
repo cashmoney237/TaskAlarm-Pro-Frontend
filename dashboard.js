@@ -7,7 +7,7 @@
   let customRingtoneBlobUrl = null;
   let selectedAudioFile = null;
   
-  // DOM elements (keep your existing ones)
+  // DOM elements
   const userName = document.getElementById('userName');
   const userEmail = document.getElementById('userEmail');
   const userAvatar = document.getElementById('userAvatar');
@@ -37,44 +37,67 @@
   
   if (typeof AlarmSystem !== 'undefined') AlarmSystem.init(null);
   
-  // ========= ALARM CHECKER with debug logs =========
+  // ========= TEST ALARM BUTTON (for presentation) =========
+  function addTestButton() {
+    const headerDiv = document.querySelector('.top-bar > div:last-child');
+    if (headerDiv && !document.getElementById('testAlarmBtn')) {
+      const testBtn = document.createElement('button');
+      testBtn.id = 'testAlarmBtn';
+      testBtn.className = 'btn-secondary';
+      testBtn.style.background = '#ef4444';
+      testBtn.style.color = 'white';
+      testBtn.innerHTML = '<i class="fas fa-bell"></i> Test Alarm Now';
+      testBtn.onclick = () => {
+        if (tasks.length === 0) {
+          Utils.showToast('Create a task first', 'warning');
+          return;
+        }
+        const firstPending = tasks.find(t => !t.isCompleted && !t.isMissed);
+        if (!firstPending) {
+          Utils.showToast('No pending task', 'warning');
+          return;
+        }
+        // Trigger alarm immediately for this task
+        if (typeof AlarmSystem !== 'undefined') {
+          AlarmSystem.startAlarmCycle(firstPending, () => loadTasks());
+          Utils.showToast(`🔔 Manual alarm for "${firstPending.title}"`, 'warning');
+        }
+      };
+      headerDiv.appendChild(testBtn);
+    }
+  }
+  
+  // ========= ALARM CHECKER (using local time without conversion) =========
   let lastLogTime = 0;
   function checkAlarms() {
     const now = new Date();
     const nowTime = now.getTime();
     let triggered = false;
     
-    // Log every 10 seconds to see task times
-    if (nowTime - lastLogTime > 10000) {
-      lastLogTime = nowTime;
-      console.log('=== Alarm Check at', now.toLocaleTimeString(), '===');
-      tasks.forEach(t => {
-        if (!t.isCompleted && !t.isMissed) {
-          const taskTime = new Date(t.scheduledTime).getTime();
-          const diff = (taskTime - nowTime) / 1000;
-          console.log(`  Task "${t.title}": scheduled ${new Date(t.scheduledTime).toLocaleTimeString()}, diff ${diff}s, triggered=${t.alarmTriggered}`);
-        }
-      });
-    }
-    
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
       if (task.isCompleted || task.isMissed) continue;
       
-      const taskTime = new Date(task.scheduledTime).getTime();
-      const timeDiffSec = (taskTime - nowTime) / 1000;
+      // Parse the stored scheduledTime as a local date/time string
+      // Assuming stored format like "2025-05-31T15:30"
+      const taskLocalTime = new Date(task.scheduledTime);
+      const taskTime = taskLocalTime.getTime();
+      const diffSec = (taskTime - nowTime) / 1000;
       
-      // Trigger if within 3 seconds of scheduled time (past or future)
-      if (!task.alarmTriggered && Math.abs(timeDiffSec) < 3) {
+      // Log every 10 seconds
+      if (Date.now() - lastLogTime > 10000) {
+        lastLogTime = Date.now();
+        console.log(`[${now.toLocaleTimeString()}] Task "${task.title}": scheduled ${taskLocalTime.toLocaleTimeString()}, diff=${diffSec.toFixed(1)}s, triggered=${task.alarmTriggered}`);
+      }
+      
+      // Trigger if within 3 seconds of scheduled time
+      if (!task.alarmTriggered && Math.abs(diffSec) < 3) {
         triggered = true;
         task.alarmTriggered = true;
-        console.log(`🔥 TRIGGER ALARM: "${task.title}" at ${now.toLocaleTimeString()} (scheduled ${new Date(task.scheduledTime).toLocaleTimeString()})`);
+        console.log(`🔥 TRIGGER ALARM: "${task.title}" at ${now.toLocaleTimeString()}`);
         
-        // Update backend
-        window.api.updateTask(task._id, { alarmTriggered: true })
-          .catch(err => console.error('Update failed:', err));
+        window.api.updateTask(task._id, { alarmTriggered: true }).catch(console.error);
         
-        // Send email and start sound
         if (typeof AlarmSystem !== 'undefined') {
           AlarmSystem.sendEmailNotification(
             currentUser.email,
@@ -85,15 +108,11 @@
           );
           AlarmSystem.startAlarmCycle(task, () => loadTasks());
         }
-        
         Utils.showToast(`🔔 "${task.title}" is due!`, 'warning');
-        break; // only one alarm at a time
+        break;
       }
     }
-    
-    if (triggered) {
-      loadTasks(); // refresh badges
-    }
+    if (triggered) loadTasks();
   }
   
   // ========= LOAD TASKS =========
@@ -102,7 +121,7 @@
       tasks = await window.api.getTasks();
       renderCurrentPage();
       updateBadges();
-      console.log(`Loaded ${tasks.length} tasks`);
+      addTestButton(); // ensure test button appears after tasks load
     } catch (err) {
       console.error(err);
       Utils.showToast('Failed to load tasks', 'error');
@@ -307,7 +326,7 @@
     }
   };
   
-  // ========= CREATE TASK (timezone fix) =========
+  // ========= CREATE TASK (store local datetime string, no conversion) =========
   if (taskForm) {
     taskForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -320,9 +339,8 @@
         Utils.showToast('Future time required', 'error');
         return;
       }
-      // Convert local time to UTC timestamp (preserves intended local time)
-      const utcTimestamp = localDate.getTime() - (localDate.getTimezoneOffset() * 60000);
-      const scheduledTime = new Date(utcTimestamp).toISOString();
+      // Store the local datetime string as is (e.g., "2025-05-31T15:30")
+      const scheduledTime = dateTime; // store exactly as picked by user
       try {
         await window.api.createTask({ title, description, scheduledTime });
         await loadTasks();
@@ -487,5 +505,5 @@
   }
   
   loadTasks();
-  // WebSocket disabled – alarms work via polling
+  // WebSocket disabled
 })();
