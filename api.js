@@ -3,23 +3,13 @@ const API_URL = 'https://elumbemikelawrce.onrender.com/api';
 let authToken = localStorage.getItem('token');
 
 async function apiRequest(endpoint, method, body = null) {
-    // Append token as query parameter if it exists
-    let url = `${API_URL}/${endpoint}`;
-    if (authToken && method !== 'POST') {
-        // For GET, PUT, DELETE – add token to query string
-        url += (url.includes('?') ? '&' : '?') + `token=${encodeURIComponent(authToken)}`;
-    }
     const headers = { 'Content-Type': 'application/json' };
-    if (authToken) headers['Authorization'] = `Bearer ${authToken}`; // keep for compatibility
-    const options = { method, headers };
-    if (body) options.body = JSON.stringify(body);
-    // For POST requests, also add token inside body if needed
-    if (method === 'POST' && authToken && body) {
-        body.token = authToken; // add token to body (backup)
-        options.body = JSON.stringify(body);
-    }
-    console.log(`API Request: ${method} ${url}`);
-    const response = await fetch(url, options);
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    const response = await fetch(`${API_URL}${endpoint}`, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : null
+    });
     if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || `HTTP ${response.status}`);
@@ -28,7 +18,7 @@ async function apiRequest(endpoint, method, body = null) {
 }
 
 async function apiRegister(userData) {
-    const data = await apiRequest('register.php', 'POST', userData);
+    const data = await apiRequest('/auth/register', 'POST', userData);
     if (data.token) {
         authToken = data.token;
         localStorage.setItem('token', data.token);
@@ -38,7 +28,7 @@ async function apiRegister(userData) {
 }
 
 async function apiLogin(email, password) {
-    const data = await apiRequest('login.php', 'POST', { email, password });
+    const data = await apiRequest('/auth/login', 'POST', { email, password });
     if (data.token) {
         authToken = data.token;
         localStorage.setItem('token', data.token);
@@ -59,21 +49,22 @@ function getCurrentUser() {
 }
 
 async function apiGetTasks() {
-    return apiRequest('get_tasks.php', 'GET');
+    return apiRequest('/tasks', 'GET');
 }
 
 async function apiCreateTask(task) {
-    return apiRequest('create_task.php', 'POST', task);
+    return apiRequest('/tasks', 'POST', task);
 }
 
 async function apiUpdateTask(taskId, updates) {
-    return apiRequest(`update_task.php?id=${taskId}`, 'PUT', updates);
+    return apiRequest(`/tasks/${taskId}`, 'PUT', updates);
 }
 
 async function apiDeleteTask(taskId) {
-    return apiRequest(`delete_task.php?id=${taskId}`, 'DELETE');
+    return apiRequest(`/tasks/${taskId}`, 'DELETE');
 }
 
+// Email history functions (still use localStorage – no change)
 function getEmails() {
     const user = getCurrentUser();
     if (!user) return [];
