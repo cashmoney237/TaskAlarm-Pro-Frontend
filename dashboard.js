@@ -37,35 +37,6 @@
   
   if (typeof AlarmSystem !== 'undefined') AlarmSystem.init(null);
   
-  // Test alarm button
-  function addTestButton() {
-    const headerDiv = document.querySelector('.top-bar > div:last-child');
-    if (headerDiv && !document.getElementById('testAlarmBtn')) {
-      const testBtn = document.createElement('button');
-      testBtn.id = 'testAlarmBtn';
-      testBtn.className = 'btn-secondary';
-      testBtn.style.background = '#ef4444';
-      testBtn.style.color = 'white';
-      testBtn.innerHTML = '<i class="fas fa-bell"></i> Test Alarm Now';
-      testBtn.onclick = () => {
-        if (tasks.length === 0) {
-          Utils.showToast('Create a task first', 'warning');
-          return;
-        }
-        const firstPending = tasks.find(t => !t.isCompleted && !t.isMissed);
-        if (!firstPending) {
-          Utils.showToast('No pending task', 'warning');
-          return;
-        }
-        if (typeof AlarmSystem !== 'undefined') {
-          AlarmSystem.startAlarmCycle(firstPending, () => loadTasks());
-          Utils.showToast(`🔔 Manual alarm for "${firstPending.title}"`, 'warning');
-        }
-      };
-      headerDiv.appendChild(testBtn);
-    }
-  }
-  
   // Alarm checker (timestamp based)
   let lastLogTime = 0;
   function checkAlarms() {
@@ -76,15 +47,10 @@
       if (task.isCompleted || task.isMissed) continue;
       const taskTime = typeof task.scheduledTime === 'number' ? task.scheduledTime : new Date(task.scheduledTime).getTime();
       const diffMs = taskTime - now;
-      const diffSec = diffMs / 1000;
-      if (Date.now() - lastLogTime > 10000) {
-        lastLogTime = Date.now();
-        console.log(`[${new Date().toLocaleTimeString()}] Task "${task.title}": diff=${diffSec.toFixed(1)}s, triggered=${task.alarmTriggered}`);
-      }
       if (!task.alarmTriggered && diffMs <= 3000) {
         triggered = true;
         task.alarmTriggered = true;
-        console.log(`🔥 TRIGGER ALARM: "${task.title}" (diff ${diffSec.toFixed(1)}s)`);
+        console.log(`🔥 TRIGGER ALARM: "${task.title}"`);
         window.api.updateTask(task._id, { alarmTriggered: true }).catch(console.error);
         if (typeof AlarmSystem !== 'undefined') {
           AlarmSystem.sendEmailNotification(
@@ -108,7 +74,6 @@
       tasks = await window.api.getTasks();
       renderCurrentPage();
       updateBadges();
-      addTestButton();
     } catch (err) {
       console.error(err);
       Utils.showToast('Failed to load tasks', 'error');
@@ -123,7 +88,7 @@
     if (emailBadge) emailBadge.textContent = window.api.getEmails().length;
   }
   
-  // Render functions (keep your existing ones – they work)
+  // Render functions (unchanged)
   function renderTasksPage() {
     if (!tasksList) return;
     const pending = tasks.filter(t => !t.isCompleted && !t.isMissed).sort((a,b)=>a.scheduledTime - b.scheduledTime);
@@ -326,7 +291,7 @@
         Utils.showToast('Future time required', 'error');
         return;
       }
-      const scheduledTime = localDate.getTime(); // store as timestamp
+      const scheduledTime = localDate.getTime();
       try {
         await window.api.createTask({ title, description, scheduledTime });
         await loadTasks();
@@ -356,7 +321,7 @@
     });
   });
   
-  // Logout (redirect to login.html)
+  // Logout
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
       if (typeof AlarmSystem !== 'undefined') AlarmSystem.stopAllAlarms();
@@ -485,9 +450,6 @@
       updateBadges();
       if (currentPage === 'alarms') renderAlarmsPage();
     });
-    console.log('Alarm checker started (timestamp mode)');
-  } else {
-    console.error('AlarmSystem not loaded!');
   }
   
   loadTasks();
