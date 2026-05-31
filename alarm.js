@@ -168,32 +168,21 @@ const AlarmSystem = {
     this.resetToDefault();
   },
 
-  // ✅ Email via EmailJS (with debug logs)
-sendEmailNotification(userEmail, userName, taskTitle, taskDescription, scheduledTime) {
+  // ✅ Email: store locally (no EmailJS) – history will work
+  sendEmailNotification(userEmail, userName, taskTitle, taskDescription, scheduledTime) {
     const formattedTime = new Date(scheduledTime).toLocaleString();
-    if (typeof emailjs === 'undefined') {
-        console.error('EmailJS not loaded');
-        return;
+    console.log(`📧 [DEMO] Email would be sent to ${userEmail} for task "${taskTitle}" at ${formattedTime}`);
+    
+    // Store in local history so Email History page shows it
+    if (typeof addEmail !== 'undefined') {
+      addEmail({
+        to: userEmail,
+        subject: `⏰ Task Reminder: ${taskTitle}`,
+        body: `Hello ${userName},\n\nYour task "${taskTitle}" is due at ${formattedTime}.\nDescription: ${taskDescription || 'None'}`
+      });
+      console.log('📧 Email stored in local history (demo mode)');
     }
-    emailjs.init('N-JJX0c0QdP_jw0yW');  // your public key
-    emailjs.send('service_95zfcl8', 'template_5w0r0mg', {
-        to_email: userEmail,
-        to_name: userName,
-        task_title: taskTitle,
-        task_description: taskDescription || '',
-        task_time: formattedTime
-    }).then(() => {
-        console.log('Email sent via EmailJS');
-        // optional: store in localStorage history
-        if (typeof addEmail !== 'undefined') {
-            addEmail({
-                to: userEmail,
-                subject: `Task Reminder: ${taskTitle}`,
-                body: `Your task "${taskTitle}" is due at ${formattedTime}.`
-            });
-        }
-    }).catch(err => console.error('EmailJS error:', err));
-},
+  },
 
   startChecker(callback) {
     if (this.checkerInterval) clearInterval(this.checkerInterval);
