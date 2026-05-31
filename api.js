@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost/TaskAlarm-Backend';
+const API_URL = 'https://elumbemikelawrce.onrender.com/api';
 
 let authToken = localStorage.getItem('token');
 
